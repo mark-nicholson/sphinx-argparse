@@ -259,6 +259,7 @@ class ArgParseDirective(Directive):
     has_content = True
     option_spec = dict(
         module=unchanged,
+        cls=unchanged,
         func=unchanged,
         ref=unchanged,
         prog=unchanged,
@@ -459,6 +460,17 @@ class ArgParseDirective(Directive):
             _parts = self.options['ref'].split('.')
             module_name = '.'.join(_parts[0:-1])
             attr_name = _parts[-1]
+        elif 'cls' in self.options and 'func' in self.options:
+            _parts = self.options['cls'].split('.')
+            module_name = '.'.join(_parts[0:-1])
+            cls_name = _parts[-1]
+            attr_name = self.options['func']
+            try:
+                mod = __import__(module_name, globals(), locals(), [cls_name])
+                klass = getattr(mod, cls_name)
+                func = getattr(klass, attr_name)
+            except (ImportError, AttributeError):
+                raise self.error(f'Failed to import/access "{attr_name}" from class' f' "{module_name}.{cls_name}".\n{sys.exc_info()[1]}')
         elif 'filename' in self.options and 'func' in self.options:
             mod = {}
             f = self._open_filename()
@@ -470,7 +482,7 @@ class ArgParseDirective(Directive):
             raise self.error(':module: and :func: should be specified, or :ref:, or :filename: and :func:')
 
         # Skip this if we're dealing with a local file, since it obviously can't be imported
-        if 'filename' not in self.options:
+        if 'filename' not in self.options and 'cls' not in self.options:
             try:
                 mod = __import__(module_name, globals(), locals(), [attr_name])
             except ImportError:
